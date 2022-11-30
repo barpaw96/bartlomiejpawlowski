@@ -9,10 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import com.BBIU.bartlomiejpawlowski.service.UserService;
 
 
-import javax.validation.Valid;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -29,8 +26,16 @@ public class UserController {
     private UserRepository userRepository;
 
     @PostMapping("/user")
-    User newUser(@RequestBody User newUser){
-        return userRepository.save(newUser);
+    ResponseEntity<?> newUser(@RequestBody User newUser){
+        if (userRepository.findByEmail(newUser.getEmail()).isPresent()) {
+            return ResponseEntity.status(409).body("Wrong email");
+        }   else if (userRepository.findByUsername(newUser.getUsername()).isPresent()){
+            return ResponseEntity.status(410).body("Wrong Username");
+        }
+        else {
+            userRepository.save(newUser);
+            return ResponseEntity.ok("Added");
+        }
     }
 
     @GetMapping("/users")
@@ -49,16 +54,28 @@ public class UserController {
     }
 
     @PutMapping("/user/{id}")
-    User updateUser(@RequestBody User newUser,@PathVariable Long id){
-        return userRepository.findById(id)
-                .map(user -> {
-                    user.setUsername(newUser.getUsername());
-                    user.setName(newUser.getName());
-                    user.setEmail(newUser.getEmail());
-                    user.setComment(newUser.getComment());
-                    user.setSex(newUser.getSex());
-                    return userRepository.save(user);
-                }).orElseThrow(()->new UserNotFoundException(id));
+    ResponseEntity<?> updateUser(@RequestBody User newUser,@PathVariable Long id){
+        Optional<User> user1 = userRepository.findByEmail(newUser.getEmail());
+        if (user1.isPresent() && !user1.get().getId().equals(id)) {
+            return ResponseEntity.status(409).body("Wrong email"); }
+
+        user1 = userRepository.findByUsername(newUser.getUsername());
+        if (user1.isPresent() && !user1.get().getId().equals(id)){
+            return ResponseEntity.status(410).body("Wrong Username");
+        }
+        Optional<User> optionalUser = userRepository.findById(id);
+        if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+            user.setUsername(newUser.getUsername());
+            user.setName(newUser.getName());
+            user.setEmail(newUser.getEmail());
+            user.setComment(newUser.getComment());
+            user.setSex(newUser.getSex());
+            userRepository.save(user);
+            return ResponseEntity.ok("Added");
+        } else {
+            return ResponseEntity.status(409).body("User not found");
+        }
     }
 
     @DeleteMapping("/user/{id}")
@@ -71,34 +88,7 @@ public class UserController {
     }
 
 
-    @PostMapping("/create")
-    public Map<String, Object> create(@Valid @RequestBody User data){
-
-        HashMap<String, Object> response = new HashMap<String, Object>();
-
-        try {
-
-            Optional<User> validEmail = userRepository.findByEmail(data.getEmail());
-
-            if(validEmail.isPresent()) {
-                response.put("message", "The email "+data.getEmail()+" is already registered ");
-                response.put("success", false);
-                return response;
-            }
-            else {
-                userRepository.save(data);
-                response.put("message", "Successful save");
-                response.put("success", true);
-                return response;
-            }
 
 
-        } catch (Exception e) {
-            // TODO: handle exception
-            response.put("message", e.getMessage());
-            response.put("success",false);
-            return response;
-        }
 
-    }
 }
